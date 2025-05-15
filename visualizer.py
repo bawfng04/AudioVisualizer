@@ -6,55 +6,62 @@ import os
 from tqdm import tqdm
 
 
-# ===== config:
-# tên file = example.mp3
-# background = background.jpg
-
-
 # ===== install:
-# pip install librosa numpy opencv-python tqdm
-# pip install moviepy==1.0.3
+# pip install librosa numpy opencv-python tqdm moviepy==1.0.3
 
+# ===== config:
+# tên file = input.mp3
+# background = background.jpg
 
 # ===== run:
 # python visualizer.py
 
 
+# default config: 120FPS, 1920x1080, background.jpg, input.mp3, output.mp4
+
 CONFIG = {
-    "audio_file": "example.mp3",
+    "audio_file": "input.mp3",
     "output_video": "output.mp4",
     "background_image_path": "background.jpg",
-    "fps": 30,
-    "video_width": 1280,
-    "video_height": 720,
+    "fps": 120,
+    "video_width": 1920,
+    "video_height": 1080,
     "visualizer": {
         "type": "spectrum",
         "waveform": {
             "color": (255, 165, 0),
             "thickness": 2,
-            "height_scale": 0.35,
+            "height_scale": 0.3,
             "style": "line",
-            "smoothing_window": 5
+            "smoothing_window": 7,
         },
         "spectrum": {
-            "bins": 64,
-            "color_map": "viridis",
-            "bar_width_factor": 0.9,
-            "smoothing_factor": 0.6,
-            "min_freq_hz": 50,
-            "max_freq_hz": 16000,
+            "bins": 128,
+            "color_map": "plasma",
+            "bar_width_factor": 0.85,
+            "smoothing_factor": 0.75,
+            "min_freq_hz": 20,
+            "max_freq_hz": 24000,
             "log_freq_scale": True,
-            "power_scale": 0.8,
-            "gravity_effect": 0.05,
-        }
+            "power_scale": 0.75,
+            "gravity_effect": 0.04,
+        },
     },
     "ffmpeg_params": {
         "codec": "libx264",
         "audio_codec": "aac",
-        "preset": "medium",
+        "preset": "slower",
         "threads": os.cpu_count() or 1,
-        "logger": "bar"
-    }
+        "logger": "bar",
+        "ffmpeg_custom_args": [
+            "-crf",
+            "17",  # CRF 17
+            "-pix_fmt",
+            "yuv420p",
+            "-b:a",
+            "320k",  # Bitrate audio 320kbps
+        ],
+    },
 }
 
 g_audio_data = None
@@ -262,8 +269,8 @@ def generate_video(config):
 
     g_samples_per_frame = len(g_audio_data) // total_frames
     if g_samples_per_frame == 0 and len(g_audio_data) > 0 : # Vẫn có audio nhưng không đủ cho 1 frame
-         print("Warning: Audio samples per frame is zero, but audio data exists. Adjusting FPS or audio might be needed.")
-         g_samples_per_frame = 1
+        print("Warning: Audio samples per frame is zero, but audio data exists. Adjusting FPS or audio might be needed.")
+        g_samples_per_frame = 1
     elif len(g_audio_data) == 0 and g_samples_per_frame == 0:
         print("Error: No audio data and zero samples per frame.")
         return
@@ -272,17 +279,19 @@ def generate_video(config):
     video_clip = mpy.VideoClip(make_video_frame, duration=duration)
     audio_mpy_clip = None
     final_clip = None
+    custom_ffmpeg_args = config["ffmpeg_params"].get("ffmpeg_custom_args", [])
     try:
         audio_mpy_clip = mpy.AudioFileClip(config['audio_file'])
         final_clip = video_clip.set_audio(audio_mpy_clip)
         final_clip.write_videofile(
-            config['output_video'],
-            fps=config['fps'],
+            config["output_video"],
+            fps=config["fps"],
             codec=config["ffmpeg_params"]["codec"],
             audio_codec=config["ffmpeg_params"]["audio_codec"],
             preset=config["ffmpeg_params"]["preset"],
             threads=config["ffmpeg_params"]["threads"],
-            logger=config["ffmpeg_params"]["logger"]
+            logger=config["ffmpeg_params"]["logger"],
+            ffmpeg_params=custom_ffmpeg_args,
         )
     except Exception as e:
         print(f"Critical error during video writing: {e}")
