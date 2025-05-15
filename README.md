@@ -1,4 +1,4 @@
-# AudioVisualizer# AudioVisualizer
+# AudioVisualizer
 
 This script generates a video with an audio visualizer from an audio file and an optional background image.
 
